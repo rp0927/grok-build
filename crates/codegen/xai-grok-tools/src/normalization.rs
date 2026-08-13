@@ -129,6 +129,12 @@ pub fn canonical_input(input: &ToolInput) -> Option<serde_json::Value> {
         | ToolInput::SchedulerList(_)
         | ToolInput::UpdateGoal(_)
         | ToolInput::Workflow(_)
+        | ToolInput::SpawnTeammate(_)
+        | ToolInput::SendMessage(_)
+        | ToolInput::TeamTaskCreate(_)
+        | ToolInput::TeamTaskClaim(_)
+        | ToolInput::TeamTaskComplete(_)
+        | ToolInput::TeamStatus(_)
         | ToolInput::Dynamic(_) => return None,
     })
 }

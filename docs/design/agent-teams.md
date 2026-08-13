@@ -320,12 +320,18 @@ is long; protocol tests target `xai-grok-config` + `xai-grok-shell` only).
 - Unit tests: flag matrix, send/read, claim race, dependency unblock
 - This design doc
 
-### P1 — Tools + spawn
+### P1 — Tools + spawn (this commit)
 
-- Register tools only when the flag is on
-- Lead-only `spawn_teammate` → existing new-session dispatch
-- `send_message` writes mailbox and wakes the target session
-- Reject `spawn_teammate` from a teammate (no nested teams)
+- Tools: `spawn_teammate`, `send_message`, `team_task_create`,
+  `team_task_claim`, `team_task_complete`, `team_status`
+- Registered in the tool registry; injected only when
+  `with_agent_teams_enabled(true)` **and** audience is Primary
+- Subagent audience always stripped (OpenCode isolation)
+- `spawn_teammate` writes a member with `session_id: None` + `spawn_prompt`;
+  the pager (P2) starts the top-level session. Nested spawn is rejected
+  (only the lead may call it)
+- Shell `agent_rebuild` reads `GROK_EXPERIMENTAL_AGENT_TEAMS` /
+  `[features] agent_teams`
 
 ### P2 — Panel
 

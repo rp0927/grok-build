@@ -7,6 +7,15 @@ fn tmp_store() -> (tempfile::TempDir, TeamStore) {
 }
 
 #[test]
+fn find_by_session_matches_lead() {
+    let (_dir, store) = tmp_store();
+    let team = store.create_for_lead("sess-lead-99", "lead", 1).unwrap();
+    let found = store.find_by_session("sess-lead-99").unwrap().unwrap();
+    assert_eq!(found.team_id, team.team_id);
+    assert!(store.find_by_session("missing").unwrap().is_none());
+}
+
+#[test]
 fn team_id_uses_first_eight_hex_digits() {
     assert_eq!(
         team_id_from_session("019ffb5b-ad0b-7833-8305-0d9b097d7e74"),
@@ -25,7 +34,7 @@ fn create_team_and_add_member() {
     assert_eq!(team.lead().unwrap().name, "lead");
 
     let team = store
-        .add_member(&team.team_id, "reviewer", Some("sess-rev".into()))
+        .add_member(&team.team_id, "reviewer", Some("sess-rev".into()), None)
         .unwrap();
     assert_eq!(team.members.len(), 2);
     assert!(team.member("reviewer").is_some());
@@ -41,7 +50,7 @@ fn create_team_and_add_member() {
 fn send_message_rejects_unknown_and_self() {
     let (_dir, store) = tmp_store();
     let team = store.create_for_lead("s1", "lead", 1).unwrap();
-    store.add_member(&team.team_id, "reviewer", None).unwrap();
+    store.add_member(&team.team_id, "reviewer", None, None).unwrap();
 
     let err = send_message(
         &store,
@@ -76,7 +85,7 @@ fn send_message_rejects_unknown_and_self() {
 fn send_message_appends_to_recipient_only() {
     let (_dir, store) = tmp_store();
     let team = store.create_for_lead("s1", "lead", 1).unwrap();
-    store.add_member(&team.team_id, "reviewer", None).unwrap();
+    store.add_member(&team.team_id, "reviewer", None, None).unwrap();
 
     send_message(
         &store,
@@ -102,8 +111,8 @@ fn send_message_appends_to_recipient_only() {
 fn claim_blocked_until_dependency_completes() {
     let (_dir, store) = tmp_store();
     let team = store.create_for_lead("s1", "lead", 1).unwrap();
-    store.add_member(&team.team_id, "builder", None).unwrap();
-    store.add_member(&team.team_id, "reviewer", None).unwrap();
+    store.add_member(&team.team_id, "builder", None, None).unwrap();
+    store.add_member(&team.team_id, "reviewer", None, None).unwrap();
 
     create_task(
         &store,
@@ -139,8 +148,8 @@ fn claim_blocked_until_dependency_completes() {
 fn second_claim_fails() {
     let (_dir, store) = tmp_store();
     let team = store.create_for_lead("s1", "lead", 1).unwrap();
-    store.add_member(&team.team_id, "a", None).unwrap();
-    store.add_member(&team.team_id, "b", None).unwrap();
+    store.add_member(&team.team_id, "a", None, None).unwrap();
+    store.add_member(&team.team_id, "b", None, None).unwrap();
     create_task(&store, &team.team_id, "t1".into(), "work".into(), vec![], 2).unwrap();
 
     claim_task(&store, &team.team_id, "t1", "a").unwrap();

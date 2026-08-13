@@ -29,6 +29,9 @@ pub struct TeamMember {
     pub role: MemberRole,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    /// Prompt the pager should send after it materializes this member (P2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spawn_prompt: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,5 +93,30 @@ impl TeamConfig {
 
     pub fn lead(&self) -> Option<&TeamMember> {
         self.members.iter().find(|m| m.role == MemberRole::TeamLead)
+    }
+
+    pub fn member_for_session(&self, session_id: &str) -> Option<&TeamMember> {
+        self.members
+            .iter()
+            .find(|m| m.session_id.as_deref() == Some(session_id))
+            .or_else(|| {
+                if self.lead_session_id == session_id {
+                    self.lead()
+                } else {
+                    None
+                }
+            })
+    }
+}
+
+/// `[a-z][a-z0-9_-]{0,31}` — same shape as Herdr agent names.
+pub fn valid_member_name(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() => {
+            name.len() <= 32
+                && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_' || c == '-')
+        }
+        _ => false,
     }
 }

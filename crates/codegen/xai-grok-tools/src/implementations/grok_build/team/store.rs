@@ -70,6 +70,7 @@ impl TeamStore {
                 name: lead_name.to_string(),
                 role: MemberRole::TeamLead,
                 session_id: Some(lead_session_id.to_string()),
+                spawn_prompt: None,
             }],
             created_unix_ms: now_unix_ms,
         };
@@ -93,6 +94,7 @@ impl TeamStore {
         team_id: &str,
         name: &str,
         session_id: Option<String>,
+        spawn_prompt: Option<String>,
     ) -> Result<TeamConfig, TeamStoreError> {
         let mut config = self.load(team_id)?;
         if config.member(name).is_some() {
@@ -102,10 +104,30 @@ impl TeamStore {
             name: name.to_string(),
             role: MemberRole::Teammate,
             session_id,
+            spawn_prompt,
         });
         self.write_config(&config)?;
         self.write_inbox(team_id, name, &[])?;
         Ok(config)
+    }
+
+    /// Scan `$root/teams/*/config.json` for a member bound to `session_id`.
+    pub fn find_by_session(&self, session_id: &str) -> Result<Option<TeamConfig>, TeamStoreError> {
+        let teams = self.root.join("teams");
+        if !teams.is_dir() {
+            return Ok(None);
+        }
+        for entry in fs::read_dir(teams)? {
+            let path = entry?.path().join("config.json");
+            if !path.exists() {
+                continue;
+            }
+            let cfg: TeamConfig = serde_json::from_str(&fs::read_to_string(path)?)?;
+            if cfg.member_for_session(session_id).is_some() {
+                return Ok(Some(cfg));
+            }
+        }
+        Ok(None)
     }
 
     pub fn bind_session(

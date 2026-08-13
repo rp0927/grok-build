@@ -99,6 +99,7 @@ pub struct AgentBuilder {
         xai_grok_tools::implementations::grok_build::deploy_app::AppBuilderDeployerConfig,
     write_file_enabled: bool,
     subagents_enabled: bool,
+    agent_teams_enabled: bool,
     background_workflows_enabled: bool,
     ask_user_question_enabled: bool,
     subagent_toggle: HashMap<String, bool>,
@@ -177,6 +178,27 @@ fn merge_tool_params(
         }
     }
 }
+fn apply_agent_teams_tool_gates(
+    tool_config: &mut xai_grok_tools::registry::types::ToolServerConfig,
+    agent_teams_enabled: bool,
+    is_subagent: bool,
+) {
+    use xai_grok_tools::implementations::grok_build::{
+        SendMessageTool, SpawnTeammateTool, TeamStatusTool, TeamTaskClaimTool,
+        TeamTaskCompleteTool, TeamTaskCreateTool, is_team_tool_id,
+    };
+    tool_config.tools.retain(|tool| !is_team_tool_id(&tool.id));
+    if !agent_teams_enabled || is_subagent {
+        return;
+    }
+    tool_config.tools.push((&SpawnTeammateTool).into());
+    tool_config.tools.push((&SendMessageTool).into());
+    tool_config.tools.push((&TeamTaskCreateTool).into());
+    tool_config.tools.push((&TeamTaskClaimTool).into());
+    tool_config.tools.push((&TeamTaskCompleteTool).into());
+    tool_config.tools.push((&TeamStatusTool).into());
+}
+
 fn apply_workflow_tool_gates(
     tool_config: &mut xai_grok_tools::registry::types::ToolServerConfig,
     background_workflows_enabled: bool,
@@ -239,6 +261,7 @@ impl AgentBuilder {
             app_builder_deployer_config: Default::default(),
             write_file_enabled: true,
             subagents_enabled: false,
+            agent_teams_enabled: false,
             background_workflows_enabled: false,
             ask_user_question_enabled: true,
             subagent_toggle: HashMap::new(),
@@ -552,6 +575,12 @@ impl AgentBuilder {
         self.subagents_enabled = enabled;
         self
     }
+    /// Enable experimental agent-team tools (`spawn_teammate`, mailbox, tasks).
+    /// Subagent audiences never receive these tools even when this is true.
+    pub fn with_agent_teams_enabled(mut self, enabled: bool) -> Self {
+        self.agent_teams_enabled = enabled;
+        self
+    }
     pub fn with_background_workflows_enabled(mut self, enabled: bool) -> Self {
         self.background_workflows_enabled = enabled;
         self
@@ -789,6 +818,11 @@ impl AgentBuilder {
             tool_config.tools.retain(|tc| tc.id != ask_user_id);
         }
         apply_workflow_tool_gates(&mut tool_config, self.background_workflows_enabled);
+        apply_agent_teams_tool_gates(
+            &mut tool_config,
+            self.agent_teams_enabled,
+            self.prompt_audience == crate::prompt::context::PromptAudience::Subagent,
+        );
         let task_tool_id = format!(
             "{}:{}",
             xai_grok_tools::types::tool::ToolNamespace::GrokBuild,
@@ -1762,7 +1796,67 @@ mod tests {
                 names.contains(&"exit_plan_mode"),
                 "[{label}] exit_plan_mode must always be present (TUI plan-mode keybind needs it); got tools: {names:?}"
             );
+            assert!(
+                !names.contains(&"spawn_teammate"),
+                "[{label}] team tools stay off unless with_agent_teams_enabled; got: {names:?}"
+            );
         }
+    }
+
+    #[tokio::test]
+    async fn agent_teams_tools_only_on_primary_when_flag_on() {
+        use crate::config::AgentDefinition;
+        use crate::prompt::context::PromptAudience;
+        use xai_grok_tools::computer::local::LocalTerminalBackend;
+        use xai_grok_tools::notification::ToolNotificationHandle;
+
+        let primary = AgentBuilder::new(
+            std::env::temp_dir(),
+            Arc::new(LocalTerminalBackend::new()),
+            ToolNotificationHandle::noop(),
+        )
+        .from_definition(AgentDefinition::default_grok_build())
+        .with_agent_teams_enabled(true)
+        .with_prompt_audience(PromptAudience::Primary)
+        .build()
+        .await
+        .expect("primary");
+        let primary_names: Vec<String> = primary
+            .tool_definitions()
+            .await
+            .iter()
+            .map(|d| d.function.name.clone())
+            .collect();
+        assert!(
+            primary_names.iter().any(|n| n == "spawn_teammate"),
+            "primary+flag should list spawn_teammate: {primary_names:?}"
+        );
+        assert!(primary_names.iter().any(|n| n == "send_message"));
+        assert!(primary_names.iter().any(|n| n == "team_status"));
+
+        let child = AgentBuilder::new(
+            std::env::temp_dir(),
+            Arc::new(LocalTerminalBackend::new()),
+            ToolNotificationHandle::noop(),
+        )
+        .from_definition(AgentDefinition::default_grok_build())
+        .with_agent_teams_enabled(true)
+        .with_subagents_enabled(true)
+        .with_prompt_audience(PromptAudience::Subagent)
+        .build()
+        .await
+        .expect("subagent");
+        let child_names: Vec<String> = child
+            .tool_definitions()
+            .await
+            .iter()
+            .map(|d| d.function.name.clone())
+            .collect();
+        assert!(
+            !child_names.iter().any(|n| n == "spawn_teammate"),
+            "subagent must not see team tools: {child_names:?}"
+        );
+        assert!(!child_names.iter().any(|n| n == "send_message"));
     }
     #[tokio::test]
     async fn curated_empty_toolset_fails_agent_build() {

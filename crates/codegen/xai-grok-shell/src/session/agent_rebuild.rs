@@ -267,6 +267,11 @@ impl AgentRebuildSpec {
         .with_write_file_enabled(*write_file_enabled)
         .with_fs(fs_backend.clone())
         .with_subagents_enabled(*subagents_enabled)
+        .with_agent_teams_enabled({
+            let cfg = xai_grok_config::load_effective_config_disk_only()
+                .unwrap_or_else(|_| toml::Value::Table(Default::default()));
+            xai_grok_config::agent_teams_enabled(&cfg)
+        })
         .with_subagent_toggle(subagent_toggle.clone())
         .with_background_workflows_enabled(*background_workflows_enabled)
         .with_task_model_slugs(

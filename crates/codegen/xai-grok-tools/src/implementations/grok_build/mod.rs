@@ -26,6 +26,7 @@ pub mod scheduler;
 pub mod search_replace;
 pub(crate) mod storage;
 pub mod task;
+pub mod team;
 pub mod task_output;
 pub mod todo;
 pub mod update_goal;
@@ -57,6 +58,12 @@ pub use scheduler::delete::{SCHEDULER_DELETE_TOOL_NAME, SchedulerDeleteTool};
 pub use scheduler::list::SchedulerListTool;
 pub use search_replace::SearchReplaceTool;
 pub use task::{TaskTool, is_task_tool_id};
+pub use team::{
+    SEND_MESSAGE_TOOL_NAME, SPAWN_TEAMMATE_TOOL_NAME, TEAM_STATUS_TOOL_NAME,
+    TEAM_TASK_CLAIM_TOOL_NAME, TEAM_TASK_COMPLETE_TOOL_NAME, TEAM_TASK_CREATE_TOOL_NAME,
+    TEAM_TOOL_NAMES, SendMessageTool, SpawnTeammateTool, TeamStatusTool, TeamTaskClaimTool,
+    TeamTaskCompleteTool, TeamTaskCreateTool, is_team_tool_id,
+};
 pub use task_output::{GetTerminalCommandOutputTool, TaskOutputTool, WaitTasksTool};
 pub use todo::TodoWriteTool;
 pub use update_goal::{UPDATE_GOAL_TOOL_NAME, UpdateGoalTool};
