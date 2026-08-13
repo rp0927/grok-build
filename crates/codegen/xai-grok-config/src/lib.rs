@@ -45,7 +45,7 @@ pub use global_hook_sources::{
 };
 pub use loader::{
     CampaignsState, ConfigLayers, HookConfigLayer, HookProvenance, MANAGED_CONFIG_FILENAME,
-    ManagedConfigLayer, REQUIREMENTS_FILENAME, USER_CONFIG_FILENAME,
+    ManagedConfigLayer, REQUIREMENTS_FILENAME, USER_CONFIG_FILENAME, agent_teams_enabled,
     apply_version_overrides_with_registered, campaigns_application_disabled, campaigns_state_path,
     deep_merge_toml, expand_env_vars_in_string, expand_env_vars_in_toml, hook_config_layers,
     hook_config_layers_at, load_config_file, load_dismissed_ids_from_home,

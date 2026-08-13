@@ -578,6 +578,25 @@ impl ConfigLayers {
     }
 }
 
+/// Experimental Agent Teams (in-process panel + peer mailbox).
+///
+/// Off by default. Enable with `GROK_EXPERIMENTAL_AGENT_TEAMS=1` or
+/// `[features] agent_teams = true`. Env `0` / `false` wins over config so a
+/// session can disable the surface without editing toml.
+pub fn agent_teams_enabled(base_effective: &toml::Value) -> bool {
+    match crate::env_bool("GROK_EXPERIMENTAL_AGENT_TEAMS") {
+        Some(true) => true,
+        Some(false) => false,
+        None => {
+            base_effective
+                .get("features")
+                .and_then(|f| f.get("agent_teams"))
+                .and_then(|c| c.as_bool())
+                == Some(true)
+        }
+    }
+}
+
 /// `GROK_CAMPAIGNS=0` or `[features] campaigns = false` on pre-campaign base.
 pub fn campaigns_application_disabled(base_effective: &toml::Value) -> bool {
     if crate::env_bool("GROK_CAMPAIGNS") == Some(false) {
@@ -961,6 +980,33 @@ mod tests {
             "leaked the source snippet/caret: {msg}"
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    /// `GROK_EXPERIMENTAL_AGENT_TEAMS` is process-global; serialize with a
+    /// module-local mutex and restore the prior value.
+    #[test]
+    fn agent_teams_flag_env_and_config() {
+        static ENV_GUARD: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _g = ENV_GUARD.lock().unwrap_or_else(|p| p.into_inner());
+        let prior = std::env::var_os("GROK_EXPERIMENTAL_AGENT_TEAMS");
+        let empty = toml::Value::Table(Default::default());
+        let enabled = toml::from_str("[features]\nagent_teams = true\n").unwrap();
+
+        // SAFETY: ENV_GUARD serializes this test against itself.
+        unsafe { std::env::remove_var("GROK_EXPERIMENTAL_AGENT_TEAMS") };
+        assert!(!agent_teams_enabled(&empty));
+        assert!(agent_teams_enabled(&enabled));
+
+        unsafe { std::env::set_var("GROK_EXPERIMENTAL_AGENT_TEAMS", "1") };
+        assert!(agent_teams_enabled(&empty));
+
+        unsafe { std::env::set_var("GROK_EXPERIMENTAL_AGENT_TEAMS", "0") };
+        assert!(!agent_teams_enabled(&enabled));
+
+        match prior {
+            Some(v) => unsafe { std::env::set_var("GROK_EXPERIMENTAL_AGENT_TEAMS", v) },
+            None => unsafe { std::env::remove_var("GROK_EXPERIMENTAL_AGENT_TEAMS") },
+        }
     }
 
     /// `GROK_CAMPAIGNS=0` disables campaign application regardless of config.
