@@ -38,6 +38,104 @@ Grok 1.0.3 already has adjacent surfaces that are **not** a team:
 Plugins cannot inject TUI chrome. A native panel has to be drawn in
 `xai-grok-pager`.
 
+## Competitive benchmark (2026-08-13)
+
+Three different products get called “teams.” Mixing them is how a Grok
+panel plan goes wrong.
+
+| Layer | Job | Examples |
+|---|---|---|
+| **In-process team protocol** | One harness: mailbox, shared tasks, panel inside that TUI | Claude Agent Teams, OpenCode teams, this proposal |
+| **Host / multiplexer** | Owns PTYs. Native CLIs stay native. Status + wait + split | Herdr, Orca terminals, tmux/Zellij |
+| **Manager app** | Window over agents: worktrees, diffs, review queues | Claude Squad, Conductor, Emdash, Superset, Nimbalyst |
+
+This fork implements the **first** layer. It does not replace Herdr or Orca.
+
+### Feature matrix
+
+| Capability | Claude Teams | OpenCode Teams | Codex `multi_agent` | Grok 1.0.3 | **This fork** | Herdr 0.6.2 (local) | Orca 1.4.180 | Claude Squad |
+|---|---|---|---|---|---|---|---|---|
+| Panel **inside** the agent TUI | Yes (below prompt) | Yes (TUI PR #12732) | No (issue #12047 open) | No | **P2 target** | No (sidebar is the host UI) | No (desktop panes) | No (manager TUI) |
+| Split / see all at once | tmux / iTerm2 | Same process | No | Dashboard overlay | Dashboard + optional host split | Native panes | `terminal split` | tmux attach |
+| Peer mailbox | File JSON + `SendMessage` | JSONL + auto-wake | Parent↔child only | No | **P0 done** | `agent prompt` to another pane | `orchestration send` | No |
+| Shared task list + claim | Yes, file lock | Yes, atomic claim | No | Session TODO only | **P0 done** | No | `task-create` / DAG | Human task list |
+| `working` / `blocked` / `idle` | Panel rows | Two state machines | Spawn/close events | Dashboard + tasks pane | Reuse roster activity | **Core product** | `tui-idle` wait | Preview pane |
+| Wait until blocked | Lead sees permission | Plan approval tool | No | Permission bubbles to parent | Later | `agent wait --until blocked` | `check --wait` | Human attach |
+| Agent spawns a teammate | Yes | `team_spawn` | Sub-agent spawn | `spawn_subagent` (not a teammate) | **P1** | `pane split` + `agent start` | `worker-start` | Human presses `n` |
+| Mix Grok + Codex + Claude | No | Multi-provider **yes** | Codex only | Grok only | Grok only (v1) | **Yes** (20 CLIs) | **Yes** (`--agent`) | **Yes** |
+| UI close, agents keep running | Lead process must live | Server process | Session process | Leader process | Same as Grok leader | **Yes** (background server) | Desktop runtime | tmux daemon |
+| Git worktree isolation | Optional / not required | Not required | Optional | Subagent `isolation` | **No** (same tree) | Optional `herdr worktree` | Default worktree (skill forbids it for teams) | **Required** |
+| Human opens one teammate | Enter on panel | Session switch | No | Dashboard peek | Enter on panel | `herdr agent attach` | Click pane / `terminal send` | `Enter` attach |
+| Team tools hidden from subagents | Yes | Deny list + hide | N/A | N/A | **P1 must-do** | N/A (no team tools) | Subagents ≠ workers | N/A |
+
+### What each product actually is
+
+**Claude Agent Teams** — the product target. Experimental flag. Teammates are
+full Claude sessions. In-process panel **or** tmux/iTerm2. Mailbox on disk.
+Idle rows hide after 30s. Plan approval. No nested teams. No resume of
+in-process teammates.
+
+**OpenCode teams** — same idea, single process. JSONL inbox (O(1) append),
+event-driven auto-wake (spawn is fire-and-forget; idle lead restarts when
+mailed), full mesh (not lead-centric), multi-provider, two state machines
+(member + execution). Sub-agents cannot see `team_*` tools. Crash recovery
+marks teammates ready but does **not** auto-restart (credit safety).
+
+**Codex** — `multi_agent` is stable and on here; it is parent→child
+orchestration, not a team. `multi_agent_v2` is off. `collaboration_modes`
+was removed. `#12047` still asks for named agents, `team.toml`, a team chat
+panel, and `@mention`. Do not treat enabling v2 as a panel.
+
+**Grok 1.0.3** — Dashboard is a **fleet switcher** (top-level sessions,
+peek/reply/dispatch). Tasks pane is observational. Leader is multi-client
+attach to the same process. Workflows are a parent-owned DAG. Hooks never
+emit `teammate`.
+
+**Herdr** (user said “herder”; product is [herdr.dev](https://herdr.dev),
+local binary `herdr 0.6.2` at `~/.local/bin/herdr`) — **not** a team
+protocol inside Grok. It is a Rust background server that owns real PTYs.
+Grok/Claude/Codex stay themselves. Sidebar rolls `blocked` / `working` /
+`idle` / `done`. Agents drive it via CLI + socket when `HERDR_ENV=1`:
+`pane split`, `agent start`, `agent prompt --wait`, `agent wait --until
+blocked`, `agent read`. Detach with `ctrl+b q`; close the lid and the herd
+keeps running. Grok is detected by **screen manifest**, not full lifecycle
+hooks — blocked detection is strict and can fall back to idle. Herdr’s
+compare page puts Conductor/Emdash/Superset in the “manager app: quit the
+window, agents die” bucket.
+
+**Orca** (this machine: app **1.4.180**) — desktop host, not an in-TUI
+panel. Capabilities we already use: `terminal.multiplex.v1` (`terminal
+split`), `orchestration.federation.v1` (`send` / `check --wait` / `inbox` /
+`reply`), `task-create` + DAG, `worker-start` / `worker_done` /
+`escalation`, `gate-create`, `terminal wait --for tui-idle`. `/agent-team`
+is the Orca analog of Claude **split-pane** mode, not in-process. Orca
+orchestration is the closest **mailbox + task DAG** we already operate;
+Herdr is the closest **blocked/idle wait on a foreign TUI**.
+
+**Claude Squad (`cs`)** — HITL manager. tmux session + git worktree per
+task. Human creates sessions (`n`), attaches, reviews diffs, checkouts.
+Agents do not message each other. Good for parallel tickets, not a debate.
+
+**Manager apps** (Conductor, Emdash, Superset, Nimbalyst) — visual
+worktrees / Kanban / diffs. Pair *with* a runtime. They are not where a
+Grok-native panel should live.
+
+### Steal / don’t steal
+
+| Steal from | Into this fork |
+|---|---|
+| Claude | Panel under the prompt; ↑↓ / Enter / idle collapse; plan-approval mailbox kind; no nested teams |
+| OpenCode | Auto-wake idle lead on mailbox write; hide team tools from `spawn_subagent`; JSONL later if array rewrites hurt |
+| Herdr | Surface `blocked` vs `idle` on panel rows; do **not** reinvent pane split / PTY ownership |
+| Orca | `worker_done`-style idle notify (mailbox kind); task DAG already in P0; keep `/agent-team` as the split host |
+| Codex #12047 | Named `@handle` in panel rows only — skip `team.toml` / cross-team `@devops` for v1 |
+| Claude Squad | Nothing in v1 (worktrees are a non-goal) |
+
+**Do not** build a Herdr clone inside Grok (no socket API, no 20 CLIs, no
+background PTY server). **Do not** build an Orca clone inside Grok (no
+desktop worktree IDE). If the user wants mixed Grok+Codex panes that
+survive lid-close, run this fork **inside Herdr or Orca**, same as today.
+
 ## Goals
 
 1. Opt-in experimental flag. Off by default. No behavior change when unset.
@@ -235,6 +333,9 @@ is long; protocol tests target `xai-grok-config` + `xai-grok-shell` only).
 - Attach in `AgentView::draw`
 - Keys and focus (`ActivePane::Team`)
 - Snapshot tests for 0 / 1 / N members and idle collapse
+- Row states: working / blocked / idle / done (Herdr rollup names; map from
+  existing `RosterActivity` + permission/question chrome)
+- Auto-wake the lead session when a mailbox write lands (OpenCode)
 
 ### P3 — Lead loop + docs
 
@@ -268,6 +369,12 @@ with zero TUI change.
 ## References
 
 - Claude Agent Teams: https://code.claude.com/docs/en/agent-teams
+- OpenCode teams write-up: https://dev.to/uenyioha/porting-claude-codes-agent-teams-to-opencode-4hol
+- Codex TUI request: https://github.com/openai/codex/issues/12047
+- Herdr: https://herdr.dev/ · agents https://herdr.dev/docs/agents/ · automation https://herdr.dev/docs/agent-automation/ · compare https://herdr.dev/compare/
+- Herdr skill: https://github.com/herdrdev/herdr/blob/v0.8.0/skills/herdr/SKILL.md
+- Orca orchestration: `orca skills get orchestration` · CLI `orca orchestration --help`
+- Claude Squad: https://github.com/smtg-ai/claude-squad
 - Grok dashboard: `crates/codegen/xai-grok-pager/docs/user-guide/23-dashboard.md`
 - Grok subagents: `…/16-subagents.md` (hook note: no `teammate` type)
 - Leader roster: `xai-grok-pager/src/app/roster.rs`
