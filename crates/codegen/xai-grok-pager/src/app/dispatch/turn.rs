@@ -51,6 +51,17 @@ pub(super) fn apply_cancel_subagents_preference_global(app: &mut AppView, stop: 
     }
 }
 
+pub(super) fn dispatch_team_interrupt(app: &mut AppView, session_id: String) -> Vec<Effect> {
+    let Some(id) = crate::app::team_runtime::agent_id_for_session(app, &session_id) else {
+        return vec![];
+    };
+    let Some(agent) = app.agents.get_mut(&id) else {
+        return vec![];
+    };
+    cancel_agent_turn(
+        agent, /* cancel_rewind_enabled */ false, /* cancel_subagents */ true,
+    )
+}
 pub(super) fn dispatch_cancel_turn(app: &mut AppView) -> Vec<Effect> {
     let ActiveView::Agent(id) = app.active_view else {
         return vec![];

@@ -333,15 +333,16 @@ is long; protocol tests target `xai-grok-config` + `xai-grok-shell` only).
 - Shell `agent_rebuild` reads `GROK_EXPERIMENTAL_AGENT_TEAMS` /
   `[features] agent_teams`
 
-### P2 — Panel
+### P2 — Panel (this commit)
 
-- `views/team_panel/` reusing `dashboard::row` paint helpers where possible
-- Attach in `AgentView::draw`
-- Keys and focus (`ActivePane::Team`)
-- Snapshot tests for 0 / 1 / N members and idle collapse
-- Row states: working / blocked / idle / done (Herdr rollup names; map from
-  existing `RosterActivity` + permission/question chrome)
-- Auto-wake the lead session when a mailbox write lands (OpenCode)
+- `views/team_panel.rs` — desired height, idle collapse, ↑↓/Enter/x, Ctrl+T tasks
+- Attach in `AgentView::draw` immediately above the prompt
+- Keys and focus (`ActivePane::Team`); mouse click focuses the band
+- Unit tests: 0 / 1 / N members, idle collapse, pending rows never hide
+- Row states: working / blocked / idle / done / pending (permission/question → blocked)
+- Pending `spawn_teammate` rows become top-level sessions (`dispatch_new_session_inner_with_id`)
+  and bind `session_id` on ACP session create
+- Mailbox delivery injects tagged user turns; idle members auto-wake via the queue drain
 
 ### P3 — Lead loop + docs
 

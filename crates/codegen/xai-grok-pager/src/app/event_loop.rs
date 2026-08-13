@@ -2333,6 +2333,13 @@ pub(crate) async fn run(
                         break;
                     }
                 }
+                crate::app::team_runtime::sync(&mut app);
+                if !app.pending_effects.is_empty() {
+                    let effs = std::mem::take(&mut app.pending_effects);
+                    if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+                        break;
+                    }
+                }
 
                 // Drain immediately-ready ACP messages before drawing.
                 // During streaming, dozens of messages queue per frame;
@@ -2553,6 +2560,14 @@ pub(crate) async fn run(
                     }
                     presenter.request(false);
                 } else if app.tick() {
+                    presenter.request(false);
+                }
+                crate::app::team_runtime::sync(&mut app);
+                if !app.pending_effects.is_empty() {
+                    let effs = std::mem::take(&mut app.pending_effects);
+                    if process_effects(effs, &mut tasks, &mut app, &progress_tx) {
+                        break;
+                    }
                     presenter.request(false);
                 }
                 // Keep ticking as long as there are running animations

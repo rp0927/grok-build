@@ -147,6 +147,7 @@ use crate::views::question_view::QuestionViewState;
 use crate::views::queue_pane::QueuePane;
 use crate::views::subagent_catalog_pane::SubagentCatalogPane;
 use crate::views::tasks_pane::TasksPane;
+use crate::views::team_panel::TeamPanel;
 use crate::views::todo_pane::TodoPane;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -778,6 +779,9 @@ pub struct AgentView {
     /// Sticky: once the user types in the prompt, hide the tip for the session.
     pub tip_typing_dismissed: bool,
     pub todo: TodoPane,
+    pub team: TeamPanel,
+    /// Bind this teammate view to `(team_id, member_name)` once ACP assigns a session id.
+    pub team_bind: Option<(String, String)>,
     pub tasks: TasksPane,
     pub catalog: SubagentCatalogPane,
     pub queue: QueuePane,

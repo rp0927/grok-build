@@ -7,6 +7,21 @@ fn tmp_store() -> (tempfile::TempDir, TeamStore) {
 }
 
 #[test]
+fn bind_session_clears_spawn_prompt() {
+    let (_dir, store) = tmp_store();
+    let team = store.create_for_lead("lead-sid", "lead", 1).unwrap();
+    store
+        .add_member(&team.team_id, "reviewer", None, Some("review this".into()))
+        .unwrap();
+    let team = store
+        .bind_session(&team.team_id, "reviewer", "rev-sid")
+        .unwrap();
+    let member = team.member("reviewer").unwrap();
+    assert_eq!(member.session_id.as_deref(), Some("rev-sid"));
+    assert!(member.spawn_prompt.is_none());
+}
+
+#[test]
 fn find_by_session_matches_lead() {
     let (_dir, store) = tmp_store();
     let team = store.create_for_lead("sess-lead-99", "lead", 1).unwrap();

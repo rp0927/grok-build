@@ -14,6 +14,7 @@ use crate::views::prompt_widget::PromptWidget;
 use crate::views::queue_pane::QueuePane;
 use crate::views::subagent_catalog_pane::SubagentCatalogPane;
 use crate::views::tasks_pane::TasksPane;
+use crate::views::team_panel::TeamPanel;
 use crate::views::todo_pane::TodoPane;
 use ratatui::layout::Rect;
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -93,6 +94,8 @@ impl AgentView {
             prompt,
             tip_typing_dismissed: false,
             todo: TodoPane::new(),
+            team: TeamPanel::new(),
+            team_bind: None,
             tasks: TasksPane::new(),
             catalog: SubagentCatalogPane::new(),
             queue: QueuePane::new(),
@@ -1079,6 +1082,7 @@ impl AgentView {
             ActivePane::Prompt => ActivePaneSnapshot::Prompt,
             ActivePane::Tasks => ActivePaneSnapshot::Tasks,
             ActivePane::Catalog => ActivePaneSnapshot::Catalog,
+            ActivePane::Team => ActivePaneSnapshot::Other,
         };
         let outcome_snap = match outcome {
             InputOutcome::Changed | InputOutcome::ArmPending { .. } => OutcomeSnapshot::Changed,

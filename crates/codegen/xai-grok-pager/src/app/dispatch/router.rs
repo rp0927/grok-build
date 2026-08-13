@@ -5,8 +5,8 @@ use super::auth::{
 };
 use super::billing::dispatch_open_supergrok_url;
 use super::ctx::{
-    active_agent_session_id, get_active_agent_mut, navigate_clearing_selection, open_url_or_show,
-    sync_sleep_inhibitor, with_active_agent, with_scrollback,
+    SwitchCause, active_agent_session_id, get_active_agent_mut, navigate_clearing_selection,
+    open_url_or_show, switch_to_agent, sync_sleep_inhibitor, with_active_agent, with_scrollback,
 };
 use super::dashboard::{
     dispatch_dashboard_attach, dispatch_dashboard_begin_rename, dispatch_dashboard_change_location,
@@ -109,6 +109,7 @@ use super::transcript::{
 };
 use super::turn::{
     dispatch_cancel_scheduled_task, dispatch_cancel_turn, dispatch_cancel_turn_choice,
+    dispatch_team_interrupt,
     dispatch_demote_to_background, dispatch_kill_bg_task, dispatch_kill_subagent,
 };
 use super::voice::{dispatch_enable_voice_mode, dispatch_voice_stop, dispatch_voice_toggle};
@@ -992,6 +993,15 @@ pub(crate) fn dispatch(action: Action, app: &mut AppView) -> Vec<Effect> {
                 open_url_or_show(app, &url);
             }
             vec![]
+        }
+        Action::TeamOpen { session_id } => {
+            if let Some(id) = crate::app::team_runtime::agent_id_for_session(app, &session_id) {
+                switch_to_agent(app, id, SwitchCause::Picker);
+            }
+            vec![]
+        }
+        Action::TeamInterrupt { session_id } => {
+            dispatch_team_interrupt(app, session_id)
         }
         Action::CancelTurn => dispatch_cancel_turn(app),
         Action::CancelTurnChoice(choice) => dispatch_cancel_turn_choice(app, choice),

@@ -347,7 +347,7 @@ pub(in crate::app::dispatch) fn dispatch_new_session_inner(
 /// Sibling that returns the new `AgentId` alongside
 /// the effects. Used by `dispatch_dashboard_dispatch` so it doesn't
 /// rely on the (correct-but-brittle) `app.agents.last()` lookup.
-pub(in crate::app::dispatch) fn dispatch_new_session_inner_with_id(
+pub(in crate::app) fn dispatch_new_session_inner_with_id(
     app: &mut AppView,
     model_id: Option<acp::ModelId>,
 ) -> (AgentId, Vec<Effect>) {
@@ -1046,7 +1046,7 @@ pub(in crate::app::dispatch) fn handle_session_created(
     let agent_count = app.agents.len();
     let switch_hint =
         crate::views::dashboard::session_switch_hint_command(app.screen_mode.is_minimal());
-    if let Some(agent) = app.agents.get_mut(&agent_id) {
+    let effects = if let Some(agent) = app.agents.get_mut(&agent_id) {
         let session_id_clone = session_id.clone();
         if agent.session.created_via_new
             && agent_count > 1
@@ -1142,9 +1142,12 @@ pub(in crate::app::dispatch) fn handle_session_created(
         });
         notify_session_ready(&app.notification_service, agent);
         note_peek_page_flip(app, agent_id, drain.page_flip_entry);
-        return effects;
-    }
-    vec![]
+        effects
+    } else {
+        vec![]
+    };
+    crate::app::team_runtime::on_session_bound(app, agent_id);
+    effects
 }
 pub(in crate::app::dispatch) fn handle_worktree_session_created(
     app: &mut AppView,
@@ -1155,7 +1158,7 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
     new_models: Option<acp::SessionModelState>,
     scheduler_background_loops: Option<bool>,
 ) -> Vec<Effect> {
-    if let Some(agent) = app.agents.get_mut(&agent_id) {
+    let effects = if let Some(agent) = app.agents.get_mut(&agent_id) {
         agent.session.finish_command();
         agent.mark_turn_finished();
         let session_id_clone = session_id.clone();
@@ -1250,9 +1253,12 @@ pub(in crate::app::dispatch) fn handle_worktree_session_created(
         });
         notify_session_ready(&app.notification_service, agent);
         note_peek_page_flip(app, agent_id, drain.page_flip_entry);
-        return effects;
-    }
-    vec![]
+        effects
+    } else {
+        vec![]
+    };
+    crate::app::team_runtime::on_session_bound(app, agent_id);
+    effects
 }
 /// Surface a session-creation failure on the welcome screen (no toast sink).
 fn push_session_create_failure_warning(app: &mut AppView, msg: &str) {

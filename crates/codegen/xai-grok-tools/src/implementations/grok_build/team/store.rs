@@ -143,8 +143,47 @@ impl TeamStore {
             .find(|m| m.name == name)
             .ok_or_else(|| TeamStoreError::UnknownMember(name.to_string()))?;
         member.session_id = Some(session_id.to_string());
+        member.spawn_prompt = None;
         self.write_config(&config)?;
         Ok(config)
+    }
+
+    pub fn cursor_path(&self, team_id: &str, member: &str) -> PathBuf {
+        self.team_dir(team_id)
+            .join("inboxes")
+            .join(format!("{member}.cursor"))
+    }
+
+    pub fn read_cursor(
+        &self,
+        team_id: &str,
+        member: &str,
+    ) -> Result<Option<String>, TeamStoreError> {
+        let path = self.cursor_path(team_id, member);
+        if !path.exists() {
+            return Ok(None);
+        }
+        let raw = fs::read_to_string(path)?;
+        let id = raw.trim();
+        if id.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(id.to_string()))
+        }
+    }
+
+    pub fn write_cursor(
+        &self,
+        team_id: &str,
+        member: &str,
+        last_id: &str,
+    ) -> Result<(), TeamStoreError> {
+        let path = self.cursor_path(team_id, member);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        write_atomically(&path, last_id, Some(0o600))?;
+        Ok(())
     }
 
     pub fn write_config(&self, config: &TeamConfig) -> Result<(), TeamStoreError> {

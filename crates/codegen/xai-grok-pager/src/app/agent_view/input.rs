@@ -1083,6 +1083,7 @@ impl AgentView {
                 AgentPane::Queue => self.handle_queue_key(key, registry),
                 AgentPane::Tasks => self.handle_bg_tasks_key(key, registry),
                 AgentPane::Catalog => self.handle_catalog_key(key, registry),
+                AgentPane::Team => self.handle_team_key(key),
             },
             Event::Paste(text) => {
                 if self.active_pane == AgentPane::Scrollback
@@ -1130,7 +1131,7 @@ impl AgentView {
                         AgentPane::Tasks => self.tasks.handle_paste(text),
                         AgentPane::Catalog => self.catalog.handle_paste(text),
                         AgentPane::Queue => self.queue.handle_paste(text),
-                        AgentPane::Prompt | AgentPane::Scrollback => false,
+                        AgentPane::Prompt | AgentPane::Scrollback | AgentPane::Team => false,
                     };
                     if consumed {
                         InputOutcome::Changed
