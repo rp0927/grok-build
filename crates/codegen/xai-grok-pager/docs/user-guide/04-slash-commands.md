@@ -24,6 +24,12 @@ Open the [Agent Dashboard](23-dashboard.md): live roster of top-level sessions i
 
 Not `/config-agents` (alias `/agents`), which manages agent *definitions* and personas. Hidden in minimal mode; disable with `GROK_AGENT_DASHBOARD=0` or `[dashboard].enabled = false`.
 
+### `/team`
+
+Show the current session's [agent team](25-agent-teams.md): members, mailbox unread counts, and shared tasks. Optional `status` (default) or `help`. Hidden unless `GROK_EXPERIMENTAL_AGENT_TEAMS=1` or `[features] agent_teams = true`.
+
+Not `/dashboard` (every session) and not `/tasks` (subagents and background jobs). Teammates are top-level sessions, not `spawn_subagent` children.
+
 ### `/compact [context]`
 
 Compress conversation history to reclaim context-window space. Pass a note to tell Grok what to keep:

@@ -195,7 +195,7 @@ pub struct SendMessageInput {
     #[serde(default)]
     pub subject: Option<String>,
     #[serde(default)]
-    #[schemars(description = "text | plan_approval | shutdown | task_update")]
+    #[schemars(description = "text | plan_approval | shutdown | task_update | idle | failed")]
     pub kind: Option<String>,
 }
 
@@ -277,6 +277,8 @@ impl xai_tool_runtime::Tool for SendMessageTool {
             Some("plan_approval") => MailboxKind::PlanApproval,
             Some("shutdown") => MailboxKind::Shutdown,
             Some("task_update") => MailboxKind::TaskUpdate,
+            Some("idle") => MailboxKind::Idle,
+            Some("failed") => MailboxKind::Failed,
             Some(other) => {
                 return Err(xai_tool_runtime::ToolError::invalid_arguments(format!(
                     "unknown kind: {other}"

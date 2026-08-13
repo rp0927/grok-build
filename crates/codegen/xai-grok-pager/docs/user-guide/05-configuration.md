@@ -63,6 +63,8 @@ screen_mode = "fullscreen"             # default render mode: "fullscreen" | "mi
 [features]
 telemetry = false                      # anonymous usage telemetry
 feedback = true                        # feedback system (default: true)
+agent_teams = false                    # experimental in-TUI agent teams (default: false);
+                                       # also GROK_EXPERIMENTAL_AGENT_TEAMS=1; env 0/false wins
 lsp_tools = false                      # expose the lsp tool
 codebase_indexing = true               # code graph indexing (default: true)
 two_pass_compaction = false            # prefire two-pass compaction (default: false, opt-in)

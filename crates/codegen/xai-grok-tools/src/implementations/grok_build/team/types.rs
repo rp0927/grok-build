@@ -50,6 +50,10 @@ pub enum MailboxKind {
     PlanApproval,
     Shutdown,
     TaskUpdate,
+    /// Teammate became idle (pager-authored; not a human turn).
+    Idle,
+    /// Teammate turn failed or was halted (pager-authored).
+    Failed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

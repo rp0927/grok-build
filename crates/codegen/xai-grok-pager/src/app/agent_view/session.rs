@@ -1175,6 +1175,10 @@ impl AgentView {
         self.app_chat_mode = chat_mode;
         self.prompt.set_screen_mode(screen_mode);
         self.set_dashboard_visible(crate::views::dashboard::dashboard_enabled());
+        self.prompt
+            .slash_controller
+            .registry_mut()
+            .set_agent_teams_visible(crate::app::team_runtime::enabled());
         self.set_has_session_announcements(crate::views::announcements::has_session_announcements(
             announcements,
         ));

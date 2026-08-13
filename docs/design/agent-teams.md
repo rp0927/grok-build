@@ -344,11 +344,12 @@ is long; protocol tests target `xai-grok-config` + `xai-grok-shell` only).
   and bind `session_id` on ACP session create
 - Mailbox delivery injects tagged user turns; idle members auto-wake via the queue drain
 
-### P3 — Lead loop + docs
+### P3 — Lead loop + docs (this commit)
 
-- Idle / failed notify the lead (mailbox kind, not `worker_done` via Orca)
-- User-guide page + slash `/team`
-- Pty e2e: flag off ⇒ no panel; flag on + spawn ⇒ row appears
+- Idle / failed notify the lead (`MailboxKind::Idle` / `Failed`, not Orca `worker_done`)
+- `/team` slash (hidden unless the flag is on)
+- User-guide `25-agent-teams.md` + contrast in `16-subagents.md` / `04-slash-commands.md`
+- Unit tests for notify transitions and `/team`; ignored pty e2e for flag-off panel chrome
 
 ## PR Plan
 

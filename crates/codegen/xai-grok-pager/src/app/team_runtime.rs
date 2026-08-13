@@ -7,7 +7,9 @@
 use std::collections::HashSet;
 use std::time::Instant;
 
-use xai_grok_shell::agent::team::{MailboxMessage, MemberRole, TeamConfig, TeamStore};
+use xai_grok_shell::agent::team::{
+    MailboxKind, MailboxMessage, MemberRole, TeamConfig, TeamStore, send_message,
+};
 
 use crate::app::agent::AgentId;
 use crate::app::agent_view::AgentView;
@@ -48,13 +50,132 @@ pub fn pending_to_materialize(
 }
 
 pub fn mailbox_delivery_prompt(msg: &MailboxMessage) -> String {
-    let header = format!("[from teammate {}, not the human]", msg.from);
+    let header = match msg.kind {
+        MailboxKind::Idle => format!("[from teammate {}, not the human] idle", msg.from),
+        MailboxKind::Failed => format!("[from teammate {}, not the human] failed", msg.from),
+        _ => format!("[from teammate {}, not the human]", msg.from),
+    };
     match msg.subject.as_deref() {
         Some(subject) if !subject.trim().is_empty() => {
             format!("{header}\n{subject}\n\n{}", msg.body)
         }
         _ => format!("{header}\n{}", msg.body),
     }
+}
+
+/// Pager-authored notice to the lead when a teammate goes idle or fails.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LeadNotify {
+    pub member: String,
+    pub kind: MailboxKind,
+    pub subject: String,
+    pub body: String,
+}
+
+/// First observation (`prev == None`) never notifies — restart/load must not
+/// spam the lead. `failed` wins over a plain idle transition.
+pub fn lead_notify_for_transition(
+    member: &str,
+    prev: Option<TeamActivity>,
+    next: TeamActivity,
+    failed: bool,
+) -> Option<LeadNotify> {
+    let Some(prev) = prev else {
+        return None;
+    };
+    if !prev.is_busy() {
+        return None;
+    }
+    if !next.is_idle_like() {
+        return None;
+    }
+    if failed {
+        return Some(LeadNotify {
+            member: member.to_string(),
+            kind: MailboxKind::Failed,
+            subject: format!("@{member} failed"),
+            body: format!("Teammate @{member} ended a turn with an error."),
+        });
+    }
+    Some(LeadNotify {
+        member: member.to_string(),
+        kind: MailboxKind::Idle,
+        subject: format!("@{member} idle"),
+        body: format!("Teammate @{member} is idle."),
+    })
+}
+
+pub fn format_team_status(store: &TeamStore, session_id: &str) -> String {
+    let team = match store.find_by_session(session_id) {
+        Ok(Some(team)) => team,
+        Ok(None) => {
+            return "No agent team on this session. Enable GROK_EXPERIMENTAL_AGENT_TEAMS \
+or [features] agent_teams, then have the lead call spawn_teammate."
+                .to_string();
+        }
+        Err(err) => return format!("Could not read the team store: {err}"),
+    };
+    let tasks = store.read_tasks(&team.team_id).unwrap_or_default();
+    let mut lines = vec![format!("team {}", team.team_id)];
+    for member in &team.members {
+        let role = match member.role {
+            MemberRole::TeamLead => "lead",
+            MemberRole::Teammate => "teammate",
+        };
+        let bound = member
+            .session_id
+            .as_deref()
+            .map(|s| format!(" session {s}"))
+            .unwrap_or_else(|| " pending".to_string());
+        let unread = store
+            .read_inbox(&team.team_id, &member.name)
+            .ok()
+            .map(|inbox| {
+                let cursor = store.read_cursor(&team.team_id, &member.name).ok().flatten();
+                undelivered(&inbox, cursor.as_deref()).len()
+            })
+            .unwrap_or(0);
+        let unread = if unread > 0 {
+            format!(" unread {unread}")
+        } else {
+            String::new()
+        };
+        lines.push(format!("  @{:<16} {role}{bound}{unread}", member.name));
+    }
+    if tasks.is_empty() {
+        lines.push("tasks: none".to_string());
+    } else {
+        lines.push(format!("tasks: {}", tasks.len()));
+        for task in tasks.iter().take(8) {
+            lines.push(format!(
+                "  [{}] {} ({:?})",
+                task.id, task.title, task.status
+            ));
+        }
+    }
+    lines.join("\n")
+}
+
+fn recent_turn_failed(agent: &AgentView) -> bool {
+    use crate::scrollback::block::RenderBlock;
+    use crate::scrollback::blocks::SessionEvent;
+    let n = agent.scrollback.len();
+    for i in (n.saturating_sub(16)..n).rev() {
+        let Some(entry) = agent.scrollback.entry(i) else {
+            continue;
+        };
+        let RenderBlock::SessionEvent(block) = &entry.block else {
+            continue;
+        };
+        match &block.event {
+            SessionEvent::TurnFailed { .. } | SessionEvent::TurnHalted { .. } => return true,
+            SessionEvent::TurnCompleted { .. } | SessionEvent::TurnCancelled { .. } => {
+                return false;
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 pub fn undelivered<'a>(
@@ -141,6 +262,14 @@ pub fn refresh_all_panels(app: &mut AppView) {
         }
         return;
     }
+    let failed: std::collections::HashMap<String, bool> = app
+        .agents
+        .values()
+        .filter_map(|a| {
+            let sid = a.session.session_id.as_ref()?.0.to_string();
+            Some((sid, recent_turn_failed(a)))
+        })
+        .collect();
     let live: std::collections::HashMap<String, TeamActivity> = app
         .agents
         .values()
@@ -150,6 +279,7 @@ pub fn refresh_all_panels(app: &mut AppView) {
         })
         .collect();
     let store = store();
+    let mut pending_notifies: Vec<(String, String, LeadNotify)> = Vec::new();
     for agent in app.agents.values_mut() {
         if agent.is_subagent_view {
             agent.team.apply_snapshot(None, Instant::now());
@@ -159,9 +289,55 @@ pub fn refresh_all_panels(app: &mut AppView) {
             agent.team.apply_snapshot(None, Instant::now());
             continue;
         };
+        let prev_rows = agent.team.rows.clone();
         let snap = snapshot_for_session(&store, &sid, &live, &agent.team.in_flight);
+        if let Some(ref snap) = snap {
+            for row in snap.rows.iter().filter(|r| !r.is_lead) {
+                let prev = prev_rows
+                    .iter()
+                    .find(|p| p.name == row.name)
+                    .map(|p| p.activity);
+                let failed = row
+                    .session_id
+                    .as_deref()
+                    .and_then(|s| failed.get(s).copied())
+                    .unwrap_or(false);
+                if let Some(notify) =
+                    lead_notify_for_transition(&row.name, prev, row.activity, failed)
+                {
+                    pending_notifies.push((snap.team_id.clone(), row.name.clone(), notify));
+                }
+            }
+        }
         agent.team.apply_snapshot(snap, Instant::now());
     }
+    let now = now_ms();
+    for (i, (team_id, from, notify)) in pending_notifies.into_iter().enumerate() {
+        let Ok(team) = store.load(&team_id) else {
+            continue;
+        };
+        let Some(lead) = team.lead() else {
+            continue;
+        };
+        let _ = send_message(
+            &store,
+            &team_id,
+            &from,
+            &lead.name,
+            notify.kind,
+            Some(notify.subject),
+            notify.body,
+            now,
+            format!("notify-{from}-{now}-{i}"),
+        );
+    }
+}
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
 }
 
 /// Create top-level sessions for pending `spawn_teammate` rows and deliver
@@ -417,5 +593,76 @@ mod tests {
         let cursor = store.read_cursor(&team.team_id, "reviewer").unwrap();
         let inbox = store.read_inbox(&team.team_id, "reviewer").unwrap();
         assert!(undelivered(&inbox, cursor.as_deref()).is_empty());
+    }
+
+    #[test]
+    fn first_sight_does_not_notify() {
+        assert!(lead_notify_for_transition(
+            "reviewer",
+            None,
+            TeamActivity::Idle,
+            false
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn working_to_idle_notifies_idle() {
+        let n = lead_notify_for_transition(
+            "reviewer",
+            Some(TeamActivity::Working),
+            TeamActivity::Idle,
+            false,
+        )
+        .unwrap();
+        assert_eq!(n.kind, MailboxKind::Idle);
+        assert!(n.body.contains("@reviewer"));
+    }
+
+    #[test]
+    fn failed_wins_over_idle() {
+        let n = lead_notify_for_transition(
+            "reviewer",
+            Some(TeamActivity::Working),
+            TeamActivity::Idle,
+            true,
+        )
+        .unwrap();
+        assert_eq!(n.kind, MailboxKind::Failed);
+    }
+
+    #[test]
+    fn idle_to_idle_is_silent() {
+        assert!(lead_notify_for_transition(
+            "reviewer",
+            Some(TeamActivity::Idle),
+            TeamActivity::Idle,
+            false
+        )
+        .is_none());
+    }
+
+    #[test]
+    fn format_status_lists_members_and_empty_tasks() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TeamStore::new(dir.path());
+        let team = store.create_for_lead("lead-sid", "lead", 1).unwrap();
+        store
+            .add_member(&team.team_id, "reviewer", None, Some("go".into()))
+            .unwrap();
+        let text = format_team_status(&store, "lead-sid");
+        assert!(text.contains(&team.team_id), "{text}");
+        assert!(text.contains("@lead"), "{text}");
+        assert!(text.contains("@reviewer"), "{text}");
+        assert!(text.contains("pending"), "{text}");
+        assert!(text.contains("tasks: none"), "{text}");
+    }
+
+    #[test]
+    fn format_status_without_team() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = TeamStore::new(dir.path());
+        let text = format_team_status(&store, "missing");
+        assert!(text.contains("No agent team"), "{text}");
     }
 }

@@ -51,6 +51,8 @@ When the main agent identifies work to delegate, it calls the `spawn_subagent` t
 
 The parent receives the child's output -- usually a summary -- when the child finishes.
 
+**Not an agent team.** A teammate is a top-level session with a mailbox and a shared task list, drawn in a panel above the lead prompt. Subagents cannot see team tools, and hooks never emit a `teammate` task type. See [Agent Teams](25-agent-teams.md).
+
 ---
 
 ## Built-in Agent Types
