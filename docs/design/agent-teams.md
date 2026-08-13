@@ -368,6 +368,9 @@ with zero TUI change.
 
 ## Open questions
 
+Still **undecided** — do not encode a choice in code. Closeout and options:
+[agent-teams-closeout.md](agent-teams-closeout.md).
+
 1. Should `/dashboard` hide teammate sessions that already appear in the
    panel, or keep showing them as ordinary top-level rows?
 2. Max teammates (Claude starts at 3–5; this workspace's Orca analog caps at 3)?
