@@ -1298,6 +1298,9 @@ impl AgentView {
         if self.active_pane == ActivePane::Queue && !self.queue.is_visible() {
             self.active_pane = ActivePane::Scrollback;
         }
+        if self.active_pane == ActivePane::Team && !self.team.is_visible() {
+            self.active_pane = ActivePane::Scrollback;
+        }
         let queue_height = self.queue.desired_height();
         let drain_blocked = self.drain_blocked();
         let watchers = self.watchers();
@@ -1323,6 +1326,11 @@ impl AgentView {
             1
         };
         let voice_recording_height = if voice_listening { 1 } else { 0 };
+        let team_height = if viewer_open || self.is_subagent_view {
+            0
+        } else {
+            self.team.desired_height(area.height)
+        };
         let _tool_usage_height = 0u16;
         let btw_height =
             crate::views::btw_overlay::btw_panel_height(self.btw_state.as_ref(), inner_width);
@@ -1357,6 +1365,7 @@ impl AgentView {
             0,
             prompt_gap,
             voice_recording_height,
+            team_height,
             1,
             compact,
         );
@@ -1433,6 +1442,7 @@ impl AgentView {
                         0,
                         prompt_gap,
                         voice_recording_height,
+                        team_height,
                         1,
                         compact,
                     );
@@ -2080,6 +2090,10 @@ impl AgentView {
             self.hit_todo_close.set(close_rect);
         } else {
             self.hit_todo_close.clear();
+        }
+        if team_height > 0 {
+            let team_focused = self.active_pane == ActivePane::Team && !overlay_focused;
+            self.team.render(layout.team, buf, team_focused);
         }
         if queue_height > 0 {
             let queue_focused = self.active_pane == ActivePane::Queue && !overlay_focused;

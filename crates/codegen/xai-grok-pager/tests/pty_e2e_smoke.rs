@@ -11,6 +11,8 @@ mod common;
 
 #[path = "pty_e2e/agent_response.rs"]
 mod agent_response;
+#[path = "pty_e2e/agent_teams_panel_hidden_when_flag_off.rs"]
+mod agent_teams_panel_hidden_when_flag_off;
 #[path = "pty_e2e/auto_compact_top_row.rs"]
 mod auto_compact_top_row;
 #[path = "pty_e2e/basename_path_demo_pty.rs"]

@@ -47,6 +47,7 @@ pub mod status_bar;
 pub mod subagent_catalog_pane;
 pub mod suggestion_controller;
 pub mod tasks_pane;
+pub mod team_panel;
 pub mod timeline;
 pub mod todo_pane;
 pub mod turn_status;

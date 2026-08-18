@@ -172,6 +172,7 @@ impl CommandRegistry {
         hidden.insert("voice".to_string());
         // `/auto` is fail-closed: hidden until `set_auto_mode_available(true)`.
         hidden.insert("auto".to_string());
+        hidden.insert("team".to_string());
         // `/share` starts menu-hidden (still dispatchable) until
         // `set_share_visible(true)`. Menu-only so typed `/share` can
         // surface a client disable message rather than PassThrough.
@@ -423,6 +424,11 @@ impl CommandRegistry {
     /// hidden it won't appear in the dropdown or be executable.
     pub fn set_dashboard_visible(&mut self, visible: bool) {
         self.set_command_visible("dashboard", visible);
+    }
+
+    /// Show or hide `/team` (experimental agent-teams flag).
+    pub fn set_agent_teams_visible(&mut self, visible: bool) {
+        self.set_command_visible("team", visible);
     }
 
     /// Show or hide the `/recap` command (shell `sessionRecap` gate).
@@ -933,6 +939,20 @@ mod tests {
         // Hiding again removes it.
         registry.set_dashboard_visible(false);
         assert!(registry.get("dashboard").is_none());
+    }
+
+    #[test]
+    fn team_command_hidden_until_flag() {
+        let team: Arc<dyn SlashCommand> = Arc::new(DummyCommand {
+            name: "team",
+            aliases: &[],
+        });
+        let mut registry = CommandRegistry::new(vec![team]);
+        assert!(registry.get("team").is_none());
+        registry.set_agent_teams_visible(true);
+        assert!(registry.get("team").is_some());
+        registry.set_agent_teams_visible(false);
+        assert!(registry.get("team").is_none());
     }
 
     // ── Builtin/skill name collisions ───────────────────────────────

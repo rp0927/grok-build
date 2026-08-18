@@ -905,6 +905,14 @@ pub enum Action {
     /// enqueue and the user expects to land inside the new
     /// agent's view immediately.
     DashboardCreateNewAgentWithDetail,
+    /// Open the teammate session bound to `session_id` (team panel Enter).
+    TeamOpen {
+        session_id: String,
+    },
+    /// Cancel the running turn of the teammate bound to `session_id` (team panel `x`).
+    TeamInterrupt {
+        session_id: String,
+    },
     /// Open the dashboard's location picker — a floating modal that
     /// lists recent project directories (plus the current cwd) and
     /// accepts a typed path, letting the user change where newly

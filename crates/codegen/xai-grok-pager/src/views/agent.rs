@@ -35,6 +35,7 @@ pub enum ActivePane {
     Prompt,
     Tasks,
     Catalog,
+    Team,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
 pub enum InputMode {
@@ -51,6 +52,7 @@ pub struct PaneAreas {
     pub prompt: Rect,
     pub tasks: Rect,
     pub catalog: Rect,
+    pub team: Rect,
 }
 impl PaneAreas {
     /// Determine which pane a screen position falls in, if any.
@@ -70,6 +72,9 @@ impl PaneAreas {
         }
         if self.scrollback.contains(pos) {
             return Some(ActivePane::Scrollback);
+        }
+        if self.team.area() > 0 && self.team.contains(pos) {
+            return Some(ActivePane::Team);
         }
         if self.prompt.contains(pos) {
             return Some(ActivePane::Prompt);
@@ -121,6 +126,8 @@ pub struct AgentViewLayout {
     /// Single-row record indicator ("◉ Recording") directly above the prompt,
     /// shown only while voice capture is active.
     pub voice_recording: Rect,
+    /// Agent-team roster (above the prompt). Empty when the flag is off.
+    pub team: Rect,
     pub prompt: Rect,
     pub shortcuts: Rect,
     /// Scrollback area narrowed for scrollbar (content rendering uses this).
@@ -173,6 +180,7 @@ impl AgentViewLayout {
         startup_warning_height: u16,
         prompt_gap: u16,
         voice_recording_height: u16,
+        team_height: u16,
         shortcuts_height: u16,
         compact: bool,
     ) -> Self {
@@ -251,6 +259,10 @@ impl AgentViewLayout {
         }
         if voice_recording_height > 0 {
             constraints.push(Constraint::Length(voice_recording_height));
+        }
+        if team_height > 0 {
+            constraints.push(Constraint::Length(1));
+            constraints.push(Constraint::Length(team_height));
         }
         constraints.push(Constraint::Length(prompt_height));
         let shortcuts_gap = if bottom_vpad == 0 { 0u16 } else { 1 };
@@ -354,6 +366,14 @@ impl AgentViewLayout {
         } else {
             Rect::default()
         };
+        let team = if team_height > 0 {
+            i += 1;
+            let r = chunks[i];
+            i += 1;
+            r
+        } else {
+            Rect::default()
+        };
         let prompt = chunks[i];
         i += 1;
         if shortcuts_gap > 0 {
@@ -395,6 +415,7 @@ impl AgentViewLayout {
             plugin_cta,
             follow_ups,
             voice_recording,
+            team,
             prompt,
             shortcuts,
             scrollback_content,
@@ -426,6 +447,7 @@ impl AgentViewLayout {
             prompt: self.prompt,
             tasks: self.tasks,
             catalog: self.catalog,
+            team: self.team,
         }
     }
 }
@@ -1068,6 +1090,15 @@ pub fn build_hints(
             hints
         }
         ActivePane::Catalog => vec![],
+        ActivePane::Team => vec![
+            HintItem::paired(
+                crate::key!(Up),
+                crate::key!(Down),
+                "select",
+            ),
+            HintItem::new(crate::key!(Enter), "open"),
+            HintItem::new(crate::key!('x'), "stop"),
+        ],
         ActivePane::Scrollback if scrollback_search.is_some() => {
             let mut hints = Vec::new();
             if vim_mode {
@@ -2121,6 +2152,7 @@ mod tests {
             0,
             0,
             0,
+            0,
             1,
             false,
         )
@@ -2142,6 +2174,7 @@ mod tests {
             scrollbar_cfg,
             timeline_width,
             2,
+            0,
             0,
             0,
             0,

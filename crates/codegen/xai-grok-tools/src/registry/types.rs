@@ -712,6 +712,12 @@ impl ToolRegistryBuilder {
         b.register::<grok_build::SchedulerCreateTool>();
         b.register::<grok_build::SchedulerDeleteTool>();
         b.register::<grok_build::SchedulerListTool>();
+        b.register::<grok_build::SpawnTeammateTool>();
+        b.register::<grok_build::SendMessageTool>();
+        b.register::<grok_build::TeamTaskCreateTool>();
+        b.register::<grok_build::TeamTaskClaimTool>();
+        b.register::<grok_build::TeamTaskCompleteTool>();
+        b.register::<grok_build::TeamStatusTool>();
         b.register::<codex::apply_patch::ApplyPatchTool>();
         b.register::<codex::list_dir::CodexListDirTool>();
         b.register::<codex::grep_files::CodexGrepFilesTool>();

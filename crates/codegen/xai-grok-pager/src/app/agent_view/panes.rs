@@ -34,6 +34,12 @@ impl AgentView {
                 return InputOutcome::Changed;
             }
             if key.code == KeyCode::Tab
+                && self.team.is_visible()
+                && self.set_active_pane(AgentPane::Team, false)
+            {
+                return InputOutcome::Changed;
+            }
+            if key.code == KeyCode::Tab
                 && self.tasks.overlay.visible
                 && self.set_active_pane(AgentPane::Tasks, false)
             {
@@ -492,6 +498,23 @@ impl AgentView {
             InputOutcome::Unchanged
         }
     }
+    pub(super) fn handle_team_key(&mut self, key: &KeyEvent) -> InputOutcome {
+        use crate::views::team_panel::TeamPanelKey;
+        match self.team.handle_key(key) {
+            TeamPanelKey::SelectChanged | TeamPanelKey::ToggleTasks => InputOutcome::Changed,
+            TeamPanelKey::FocusPrompt => {
+                self.set_active_pane(AgentPane::Prompt, false);
+                InputOutcome::Changed
+            }
+            TeamPanelKey::Open { session_id } => {
+                InputOutcome::Action(Action::TeamOpen { session_id })
+            }
+            TeamPanelKey::Interrupt { session_id } => {
+                InputOutcome::Action(Action::TeamInterrupt { session_id })
+            }
+            TeamPanelKey::Ignored => InputOutcome::Unchanged,
+        }
+    }
     /// Handle a normalized scroll event at a screen position.
     ///
     /// Hit-tests against pane areas to decide what to scroll:
@@ -666,6 +689,7 @@ impl AgentView {
             ActivePane::Catalog => {
                 self.catalog.handle_scroll(lines, col, row);
             }
+            ActivePane::Team => {}
             ActivePane::Prompt => {
                 if self.question_view.is_some() {
                     return;

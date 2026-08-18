@@ -59,6 +59,7 @@ pub mod session_info;
 pub mod settings_cmd;
 pub mod share;
 pub mod tasks;
+pub mod team;
 pub mod theme;
 pub mod timeline;
 pub mod timestamps;
@@ -142,6 +143,7 @@ pub fn builtin_commands() -> Vec<Arc<dyn SlashCommand>> {
         Arc::new(usage::UsageCommand),
         Arc::new(queue::QueueCommand),
         Arc::new(tasks::TasksCommand),
+        Arc::new(team::TeamCommand),
         Arc::new(release_notes::ReleaseNotesCommand),
         Arc::new(tutorial::TutorialCommand),
         Arc::new(config_agents::ConfigAgentsCommand),

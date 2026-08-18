@@ -648,6 +648,12 @@ pub enum ToolOutput {
     SchedulerList(crate::implementations::grok_build::scheduler::list::SchedulerListOutput),
     UpdateGoal(crate::implementations::grok_build::update_goal::UpdateGoalOutput),
     Workflow(crate::implementations::grok_build::workflow::WorkflowToolOutput),
+    SpawnTeammate(crate::implementations::grok_build::team::SpawnTeammateOutput),
+    SendMessage(crate::implementations::grok_build::team::SendMessageOutput),
+    TeamTaskCreate(crate::implementations::grok_build::team::TeamTaskCreateOutput),
+    TeamTaskClaim(crate::implementations::grok_build::team::TeamTaskClaimOutput),
+    TeamTaskComplete(crate::implementations::grok_build::team::TeamTaskCompleteOutput),
+    TeamStatus(crate::implementations::grok_build::team::TeamStatusOutput),
     /// Dynamic output for runtime-registered tools (MCP, test tools, etc.)
     Dynamic(DynamicOutput),
     /// Generic text output for tools that produce simple formatted text
@@ -996,6 +1002,12 @@ impl ToolOutput {
             }
             ToolOutput::UpdateGoal(o) => o.summary.clone(),
             ToolOutput::Workflow(o) => o.message.clone(),
+            ToolOutput::SpawnTeammate(o) => serde_json::to_string_pretty(o).unwrap_or_default(),
+            ToolOutput::SendMessage(o) => serde_json::to_string_pretty(o).unwrap_or_default(),
+            ToolOutput::TeamTaskCreate(o) => serde_json::to_string_pretty(o).unwrap_or_default(),
+            ToolOutput::TeamTaskClaim(o) => serde_json::to_string_pretty(o).unwrap_or_default(),
+            ToolOutput::TeamTaskComplete(o) => serde_json::to_string_pretty(o).unwrap_or_default(),
+            ToolOutput::TeamStatus(o) => serde_json::to_string_pretty(o).unwrap_or_default(),
             ToolOutput::Dynamic(v) => serde_json::to_string_pretty(&v.value).unwrap_or_default(),
             ToolOutput::Text(text) => text.text.clone(),
             ToolOutput::ImageGen(m) => m.prompt_text("Image generated"),
